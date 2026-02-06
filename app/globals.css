@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --stone: #e8e4df;
+  --linen: #f5f5dc;
+  --charcoal: #36454f;
+  --warm-white: #faf9f6;
+  --muted-stone: #d4d0cb;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: var(--warm-white);
+  color: var(--charcoal);
+  line-height: 1.6;
+}
+
+/* Suppress hydration errors */
+[data-hydration-error] {
+  display: none !important;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Elegant serif headings */
+h1, h2, h3, h4, h5, h6 {
+  font-family: Georgia, Cambria, 'Times New Roman', serif;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+/* Subtle transitions */
+a, button {
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+a:hover, button:hover {
+  opacity: 0.8;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--warm-white);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--muted-stone);
+  border-radius: 4px;
+}
+
+/* Focus states */
+:focus-visible {
+  outline: 2px solid var(--charcoal);
+  outline-offset: 2px;
+}
+
+/* Form inputs */
+input, textarea, select {
+  font-family: inherit;
+}
+
+/* Placeholder styling */
+::placeholder {
+  color: var(--muted-stone);
+  opacity: 1;
+}

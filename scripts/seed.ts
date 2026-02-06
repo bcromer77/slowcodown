@@ -1,0 +1,1308 @@
+import { PrismaClient, Sense, Season, Mood } from "@prisma/client";
+import bcrypt from "bcryptjs";
+
+const prisma = new PrismaClient();
+
+// Location cover images from CDN
+const locationImages: Record<string, string> = {
+  Strangford: "https://cdn.abacus.ai/images/50f7912a-eda4-43bd-b4bf-0c04e71729ea.jpg",
+  Newcastle: "https://cdn.abacus.ai/images/e8b58540-7c89-477e-869d-348a136c3fa0.jpg",
+  Downpatrick: "https://cdn.abacus.ai/images/a2b4f0c2-fbdd-4a65-87f1-10ca67605d67.jpg",
+  Bangor: "https://cdn.abacus.ai/images/5dfda77a-1ece-4eda-92b3-42c27bf81293.jpg",
+  Portaferry: "https://cdn.abacus.ai/images/f0a210cf-e782-481b-9112-684acbe88230.jpg",
+  Killyleagh: "https://cdn.abacus.ai/images/16efaa72-d611-4385-a268-af67a9256932.jpg",
+  Ardglass: "https://cdn.abacus.ai/images/ffab2ed3-d310-43c9-a316-93f0648de314.jpg",
+  Dundrum: "https://cdn.abacus.ai/images/3daf2486-f781-4433-b644-8f7c7e9e390c.jpg",
+  Warrenpoint: "https://cdn.abacus.ai/images/a81768b1-7186-49f7-b64b-72e21d0536f1.jpg",
+  Rostrevor: "https://cdn.abacus.ai/images/7c8a36c9-2d82-4809-b5ef-d46d2a89e037.jpg",
+  Hillsborough: "https://cdn.abacus.ai/images/64f3dbea-e86d-4143-ab70-b9d9af431c5e.jpg",
+  Comber: "https://cdn.abacus.ai/images/b910096f-5c58-4300-a7f5-36f569c953b6.jpg",
+  Holywood: "https://cdn.abacus.ai/images/64f3dbea-e86d-4143-ab70-b9d9af431c5e.jpg",
+  Crawfordsburn: "https://cdn.abacus.ai/images/0a9e5c35-8bef-4e0f-b2c5-ed706604aae7.png",
+  Castlewellan: "https://cdn.abacus.ai/images/f4cf0ea8-8afb-4189-b886-2cf5bb410037.png",
+  "Helen's Bay": "https://cdn.abacus.ai/images/a54f2ff2-4c0c-48c3-947f-1a0ee2653062.png",
+  Groomsport: "https://cdn.abacus.ai/images/4d534aee-d162-4dd6-ab5a-9c24beea0ee7.png",
+  Tollymore: "https://cdn.abacus.ai/images/4b90f545-1c01-435c-9823-f338600546ea.png",
+  Kilbroney: "https://cdn.abacus.ai/images/d883310d-12af-455d-891c-82881f0fc571.png",
+};
+
+// Course images from CDN/web
+const courseImages = {
+  oysters: "https://images.food52.com/WOUEBFDlwazwtcu8iA88nNdTecc=/9a20d335-97ae-46a9-94ab-7cfde5059728--Untitled_design_2023-05-17T123749.842.jpg",
+  scallops: "https://www.foodandwine.com/thmb/1n-0FgLVwTlqOn65iff4xtmvnkE=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/Seared-scallops-with-fennel-and-lemon-relish-FT-RECIPE0325-628e4e9291c947d587d3ce92d72095ac.jpeg",
+  fish: "https://cdn.abacus.ai/images/13a8b4b1-da63-4de4-85c1-dea890186875.png",
+  beef: "https://cdn.abacus.ai/images/65bfdc28-a252-4434-a991-0a81bf2b958c.png",
+  bread: "https://www.tasteofhome.com/wp-content/uploads/2020/02/Irish-Brown-Bread.TOH_.Nancy-Mock-6-ADedit.jpg",
+  chowder: "https://mspmag.com/downloads/65374/download/chowder-header.jpg",
+  lamb: "https://www.foodandwine.com/thmb/oZIRnf3AWNih9MwpXQlthPHdcbQ=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/rack-of-lamb-with-rosemary-butter-FT-RECIPE0925-02-de700ec7b4234d1980d0ca21f87c26d5.jpg",
+  mussels: "https://leitesculinaria.com/wp-content/uploads/2021/10/mussels-creamy-white-wine-garlic-sauce-fp.jpg",
+  salmon: "https://static.vecteezy.com/system/resources/previews/060/375/103/large_2x/delicious-smoked-salmon-canapes-with-avocado-capers-and-dill-on-toasted-multigrain-bread-photo.jpg",
+  tart: "https://www.foodandwine.com/thmb/Zp7I9u3gQYn7QkD6pFJI0w9R8oE=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/Rustic-Apple-Tart-FT-RECIPE1023-08153df19e73455687bd4c91d891237e.jpg",
+  cheese: "https://assets.epicurious.com/photos/588642ce5f76684c78cf57c1/16:9/w_2560%2Cc_limit/cheese-plate-012317.jpg",
+  crab: "https://www.foodandwine.com/thmb/CdV2Esu8zjzNsLKt8-BA4oUnddM=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/crab-and-shrimp-etouffee-FT-RECIPE0221-fa18c5f30bd64af38c6bd50e7c745af9.jpg",
+  gin: "https://i0.wp.com/247aviation.co.uk/wp-content/uploads/2024/03/Copeland-Spirits-Range-FNL.jpg?fit=1024%2C667&ssl=1",
+  whiskey: "https://images.ireland.com/media/Images/magazine/food-and-drink/echlinville-distillery-tour/8c59cecb7d9d4a3caa88d1afa80902d7.jpg?w=1934",
+  distillery: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhNVTdQwXhZ66z0Rs-HKjO010T6Ox-bB0mgAIHvOF_diXXHWEr8x3sdTin-pStYNzgKK_GleB3e3BYZhA90R54dks-10COXuI8Dpp4LEMr0HA_5KbmieDQvUwgyTRMTTK63t18DCMpSKeU7KHD3jkTYm2HttvHx88AD_w-scptlqtlY4CK0EpSeaP-G/s3000/IMG_0007.jpg",
+  potatoes: "https://thetaste.ie/wp-content/uploads/2016/10/Potato.jpg",
+  fermented: "https://images.pexels.com/photos/32147313/pexels-photo-32147313.jpeg?auto=compress&cs=tinysrgb&h=627&fit=crop&w=1200",
+  rootVeg: "https://stripedspatula.com/wp-content/uploads/2023/09/roasted-root-vegetables-social.jpg",
+};
+
+const restaurants = [
+  {
+    name: "The Cuan",
+    slug: "the-cuan",
+    location: "Strangford",
+    description: "On the shores of Strangford Lough, where the morning catch meets the evening tide. Fresh seafood from local boats, prepared simply. A place to watch the water and let time slow.",
+    mood: "QUIET" as Mood,
+    courses: [
+      {
+        name: "Strangford Lough Oysters",
+        description: "Six native oysters served on crushed ice with shallot vinegar and lemon. The taste of the lough itself, briny and clean.",
+        photo: courseImages.oysters,
+        sense: "TASTE" as Sense,
+        season: "AUTUMN" as Season,
+        ingredients: ["Strangford Lough", "native oysters", "shallot", "lemon"],
+      },
+      {
+        name: "Seared King Scallops",
+        description: "Hand-dived scallops from local waters, seared golden, served with pea puree and smoked pancetta. Three minutes from pan to plate.",
+        photo: courseImages.scallops,
+        sense: "TEXTURE" as Sense,
+        season: "WINTER" as Season,
+        ingredients: ["hand-dived scallops", "garden peas", "pancetta"],
+      },
+      {
+        name: "Whole Dover Sole",
+        description: "Simply grilled, finished with lemon, capers and brown butter. Nothing to hide behind when the fish is this fresh.",
+        photo: courseImages.fish,
+        sense: "TASTE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["Dover sole", "capers", "brown butter", "lemon"],
+      },
+    ],
+    menu: "Starter: Strangford Lough oysters (6)\nMain: Grilled whole Dover sole, capers, brown butter\nPudding: Armagh apple tart with crème fraîche",
+  },
+  {
+    name: "Mourne Seafood",
+    slug: "mourne-seafood",
+    location: "Dundrum",
+    description: "We control our own shellfish beds. What comes from the water in the morning is on your plate by evening. Nothing complicated, just honest cooking from honest fishing.",
+    mood: "COMFORTING" as Mood,
+    courses: [
+      {
+        name: "Seafood Chowder",
+        description: "Our famous chowder, thick with mussels, prawns and white fish. Served with homemade wheaten bread still warm from the oven.",
+        photo: courseImages.chowder,
+        sense: "SMELL" as Sense,
+        season: "WINTER" as Season,
+        ingredients: ["local mussels", "Portavogie prawns", "white fish", "wheaten bread"],
+      },
+      {
+        name: "Kilkeel Crab",
+        description: "Freshly dressed Kilkeel crab, brown and white meat separated, served with homemade mayonnaise and soda bread.",
+        photo: courseImages.crab,
+        sense: "TASTE" as Sense,
+        season: "SUMMER" as Season,
+        ingredients: ["Kilkeel crab", "homemade mayonnaise", "soda bread"],
+      },
+      {
+        name: "Strangford Mussels",
+        description: "A kilo of rope-grown mussels, steamed in white wine, garlic and cream. Crusty bread for the broth.",
+        photo: courseImages.mussels,
+        sense: "TASTE" as Sense,
+        season: "AUTUMN" as Season,
+        ingredients: ["Strangford mussels", "white wine", "garlic", "cream"],
+      },
+      {
+        name: "Wheaten Bread",
+        description: "Baked fresh each morning. The smell that greets you when you walk in. Served with Abernethy butter.",
+        photo: courseImages.bread,
+        sense: "SMELL" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["wholemeal flour", "buttermilk", "Abernethy butter"],
+      },
+    ],
+    menu: "Today's catch: Kilkeel crab, Strangford mussels, Portavogie prawns\nAll served with our homemade wheaten bread\nChowder always available",
+  },
+  {
+    name: "Brunel's",
+    slug: "brunels",
+    location: "Newcastle",
+    description: "At the foot of the Mournes, where the mountains meet the sea. Wild ingredients, careful cooking. We forage, we smoke, we take our time.",
+    mood: "CONTEMPLATIVE" as Mood,
+    courses: [
+      {
+        name: "Hay-Smoked Venison",
+        description: "Local venison, smoked over Mourne hay, served with beetroot and blackberry. The taste of these hills.",
+        photo: courseImages.beef,
+        sense: "SMELL" as Sense,
+        season: "AUTUMN" as Season,
+        ingredients: ["Mourne venison", "local hay", "beetroot", "wild blackberry"],
+      },
+      {
+        name: "Sea Buckthorn Curd",
+        description: "Foraged sea buckthorn from the coast, set into a silky curd with fennel meringue. Sharp, sweet, surprising.",
+        photo: courseImages.tart,
+        sense: "TASTE" as Sense,
+        season: "AUTUMN" as Season,
+        ingredients: ["foraged sea buckthorn", "fennel", "local eggs"],
+      },
+      {
+        name: "Pan-Fried Sea Bass",
+        description: "Line-caught sea bass with samphire and sea herbs gathered from the shoreline. Simply dressed with lemon oil.",
+        photo: courseImages.fish,
+        sense: "SIGHT" as Sense,
+        season: "SUMMER" as Season,
+        ingredients: ["line-caught sea bass", "foraged samphire", "sea herbs"],
+      },
+    ],
+    menu: "Tasting menu available Friday and Saturday\nToday: Sea bass, samphire, coastal herbs\nPudding: Sea buckthorn curd",
+  },
+  {
+    name: "The Lobster Pot",
+    slug: "the-lobster-pot",
+    location: "Strangford",
+    description: "Family-run since 1987. The same commitment to local fishermen, the same welcome. Kilkeel lobster when the boats come in.",
+    mood: "WARMING" as Mood,
+    courses: [
+      {
+        name: "Kilkeel Lobster",
+        description: "Whole lobster, simply grilled, served with drawn butter and a wedge of lemon. Choose your own from the tank.",
+        photo: courseImages.crab,
+        sense: "TASTE" as Sense,
+        season: "SUMMER" as Season,
+        ingredients: ["Kilkeel lobster", "drawn butter", "lemon"],
+      },
+      {
+        name: "Monkfish Teriyaki",
+        description: "Chargrilled monkfish with a light teriyaki glaze. East meets West on the shores of Strangford Lough.",
+        photo: courseImages.fish,
+        sense: "TASTE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["monkfish", "teriyaki", "sesame", "spring onion"],
+      },
+      {
+        name: "Salmon & Mussel Rigatoni",
+        description: "Fresh pasta with flaked salmon and Strangford mussels in a light cream sauce. Comfort food, done properly.",
+        photo: courseImages.mussels,
+        sense: "TEXTURE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["local salmon", "Strangford mussels", "fresh pasta", "cream"],
+      },
+    ],
+    menu: "Lobster available today (market price)\nMonkfish teriyaki\nMussels mariniere\nAll served with hand-cut chips",
+  },
+  {
+    name: "Hara",
+    slug: "hara",
+    location: "Hillsborough",
+    description: "Seasonal, local, minimal. What grows nearby, what's in season, what makes sense. The dining room is calm. The food speaks quietly.",
+    mood: "QUIET" as Mood,
+    courses: [
+      {
+        name: "Dexter Beef Tartare",
+        description: "Castlescreen Farm Dexter beef, hand-chopped, with cured egg yolk and crispy shallots. Rich, clean, essential.",
+        photo: courseImages.beef,
+        sense: "TEXTURE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["Castlescreen Dexter beef", "cured egg yolk", "shallots"],
+      },
+      {
+        name: "Root Vegetable Tasting",
+        description: "A plate of seasonal roots from local farms—roasted, pickled, pureed. Each prepared to show its character.",
+        photo: courseImages.rootVeg,
+        sense: "SIGHT" as Sense,
+        season: "WINTER" as Season,
+        ingredients: ["local carrots", "parsnips", "beetroot", "celeriac"],
+      },
+      {
+        name: "County Down Cheese",
+        description: "A selection of local cheeses, served at room temperature with quince paste and oatcakes.",
+        photo: courseImages.cheese,
+        sense: "SMELL" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["local farmhouse cheese", "quince", "oatcakes"],
+      },
+    ],
+    menu: "Set lunch: 3 courses\nSet dinner: 5 courses\nAll menus follow what's available this week",
+  },
+  {
+    name: "Wine & Brine",
+    slug: "wine-and-brine",
+    location: "Hillsborough",
+    description: "Traditional methods—brining, fermenting, preserving—meet contemporary cooking. Three dining rooms, an open kitchen, no rush.",
+    mood: "CELEBRATORY" as Mood,
+    courses: [
+      {
+        name: "Salt-Aged Sirloin",
+        description: "28-day dry-aged County Down sirloin, cooked over charcoal. Served simply with bone marrow butter.",
+        photo: courseImages.beef,
+        sense: "TASTE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["County Down beef", "bone marrow", "charcoal"],
+      },
+      {
+        name: "Fermented Vegetables",
+        description: "A plate of house-fermented vegetables—cabbage, carrots, radish—each at different stages. Complex, alive.",
+        photo: courseImages.fermented,
+        sense: "TASTE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["fermented cabbage", "pickled carrot", "radish"],
+      },
+      {
+        name: "Apple Tart",
+        description: "Armagh Bramley apples in a butter pastry, served warm with crème fraîche. Simple and perfect.",
+        photo: courseImages.tart,
+        sense: "TASTE" as Sense,
+        season: "AUTUMN" as Season,
+        ingredients: ["Armagh Bramley apples", "butter pastry", "crème fraîche"],
+      },
+    ],
+    menu: "Sharing plates available\nTonight's roast: Salt-aged sirloin\nPudding: Warm apple tart",
+  },
+  {
+    name: "The Harbour Inn",
+    slug: "the-harbour-inn",
+    location: "Ardglass",
+    description: "A working harbour, a simple inn. Our own smoker, the day's catch, bread with seaweed. What the boats bring in, we cook.",
+    mood: "COMFORTING" as Mood,
+    courses: [
+      {
+        name: "House-Smoked Salmon",
+        description: "Salmon cold-smoked in our own smoker, sliced thin, served with soda bread and horseradish cream.",
+        photo: courseImages.salmon,
+        sense: "SMELL" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["local salmon", "oak smoke", "horseradish"],
+      },
+      {
+        name: "Ardglass Scallops",
+        description: "Diver scallops from the harbour, seared and served in the shell with seaweed butter.",
+        photo: courseImages.scallops,
+        sense: "TASTE" as Sense,
+        season: "WINTER" as Season,
+        ingredients: ["Ardglass scallops", "foraged seaweed", "butter"],
+      },
+      {
+        name: "Seaweed Bread",
+        description: "Handmade wheaten bread with dulse seaweed from the rocks below. Served warm.",
+        photo: courseImages.bread,
+        sense: "SMELL" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["wholemeal flour", "dulse seaweed", "buttermilk"],
+      },
+    ],
+    menu: "Today's catch: Pollock, scallops, lobster\nAll with our seaweed bread\nSmoked salmon always available",
+  },
+  {
+    name: "Daft Eddy's",
+    slug: "daft-eddys",
+    location: "Strangford",
+    description: "On a tidal island in Strangford Lough, reached by causeway. Local beer, honest food, the best views in the county.",
+    mood: "WARMING" as Mood,
+    courses: [
+      {
+        name: "Kilkeel Scampi",
+        description: "Freshly battered scampi from Kilkeel harbour, served with hand-cut chips and mushy peas.",
+        photo: courseImages.fish,
+        sense: "TEXTURE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["Kilkeel langoustines", "beer batter", "hand-cut chips"],
+      },
+      {
+        name: "Mourne Lamb Stew",
+        description: "Slow-cooked Mourne lamb with root vegetables and thyme. A bowl of warmth on a wet afternoon.",
+        photo: courseImages.lamb,
+        sense: "SMELL" as Sense,
+        season: "WINTER" as Season,
+        ingredients: ["Mourne lamb", "carrots", "potatoes", "thyme"],
+      },
+    ],
+    menu: "Fish & chips\nMourne lamb stew\nLocal craft beers on tap",
+  },
+  {
+    name: "The Artisan Cookhouse",
+    slug: "the-artisan-cookhouse",
+    location: "Strangford",
+    description: "A contemporary bistro using seasonal County Down produce. Fish from the lough, vegetables from local farms. Fresh, bright, honest.",
+    mood: "QUIET" as Mood,
+    courses: [
+      {
+        name: "Lamb Rump",
+        description: "Pink lamb rump with crushed new potatoes and a mint and caper salsa verde. Spring on a plate.",
+        photo: courseImages.lamb,
+        sense: "TASTE" as Sense,
+        season: "SPRING" as Season,
+        ingredients: ["local lamb", "new potatoes", "mint", "capers"],
+      },
+      {
+        name: "Comber Earlies",
+        description: "The famous Comber Earlies, simply boiled with sea salt and served with local butter. Available May to July only.",
+        photo: courseImages.potatoes,
+        sense: "TASTE" as Sense,
+        season: "SUMMER" as Season,
+        ingredients: ["Comber Earlies PGI", "sea salt", "butter"],
+      },
+    ],
+    menu: "Lunch: Two courses\nDinner: Tasting menu available\nComber Earlies in season",
+  },
+  {
+    name: "Balloo House",
+    slug: "balloo-house",
+    location: "Killyleagh",
+    description: "An old coaching inn, now a modern bistro. Good value, proper cooking. The kind of place you come back to.",
+    mood: "COMFORTING" as Mood,
+    courses: [
+      {
+        name: "Monkfish & Ox Cheek",
+        description: "Roasted monkfish with sticky-glazed ox cheek, a surf and turf that makes sense.",
+        photo: courseImages.fish,
+        sense: "TEXTURE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["monkfish", "ox cheek", "red wine glaze"],
+      },
+      {
+        name: "Roast Chicken Supreme",
+        description: "Marlfield Farm free-range chicken, roasted whole and carved at the table. Sunday lunch, any day.",
+        photo: courseImages.beef,
+        sense: "SMELL" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["Marlfield Farm chicken", "roast potatoes", "gravy"],
+      },
+    ],
+    menu: "Set lunch: 2 courses £15\nA la carte dinner\nSunday roast",
+  },
+  {
+    name: "Coq & Bull",
+    slug: "coq-and-bull",
+    location: "Bangor",
+    description: "In the Clandeboye Lodge Hotel, overlooking the gardens. Locally caught fish, locally grown vegetables, locally reared meat. Everything has a story.",
+    mood: "CELEBRATORY" as Mood,
+    courses: [
+      {
+        name: "Portavogie Prawns",
+        description: "Sweet, fresh prawns from Portavogie harbour, served simply with garlic butter and crusty bread.",
+        photo: courseImages.mussels,
+        sense: "TASTE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["Portavogie prawns", "garlic butter", "crusty bread"],
+      },
+      {
+        name: "Hereford Beef",
+        description: "28-day aged Hereford beef from local farms. Cooked over charcoal, rested, served pink.",
+        photo: courseImages.beef,
+        sense: "TASTE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["Hereford beef", "charcoal", "bone marrow butter"],
+      },
+    ],
+    menu: "Dinner: Prawns, beef, local cheese\nSunday lunch available\nAfternoon tea by booking",
+  },
+  {
+    name: "The Rostrevor Inn",
+    slug: "the-rostrevor-inn",
+    location: "Rostrevor",
+    description: "Nestled beneath the Mournes, in a village that time forgot. Traditional pub, traditional welcome. Food that warms you from the inside.",
+    mood: "WARMING" as Mood,
+    courses: [
+      {
+        name: "Irish Stew",
+        description: "Mourne lamb, potatoes, onions, carrots. Slow-cooked for hours. Served with fresh soda bread.",
+        photo: courseImages.lamb,
+        sense: "SMELL" as Sense,
+        season: "WINTER" as Season,
+        ingredients: ["Mourne lamb", "potatoes", "carrots", "onions"],
+      },
+      {
+        name: "Carlingford Oysters",
+        description: "Half dozen oysters from across the lough in Carlingford. With a pint of the black stuff.",
+        photo: courseImages.oysters,
+        sense: "TASTE" as Sense,
+        season: "AUTUMN" as Season,
+        ingredients: ["Carlingford oysters", "lemon", "shallot vinegar"],
+      },
+    ],
+    menu: "Daily specials on the board\nIrish stew always available\nLive music Saturday nights",
+  },
+  {
+    name: "The Whistledown Hotel",
+    slug: "the-whistledown-hotel",
+    location: "Warrenpoint",
+    description: "On the waterfront, looking across to Carlingford. Refined dining with views of the lough. Special occasions and quiet suppers alike.",
+    mood: "CELEBRATORY" as Mood,
+    courses: [
+      {
+        name: "Tasting of Salmon",
+        description: "Local salmon three ways: cured, smoked, and seared. A celebration of one fish, three preparations.",
+        photo: courseImages.salmon,
+        sense: "TASTE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["local salmon", "beetroot cure", "oak smoke"],
+      },
+      {
+        name: "Rack of Lamb",
+        description: "Herb-crusted rack of Mourne lamb with dauphinoise potatoes and seasonal greens.",
+        photo: courseImages.lamb,
+        sense: "SIGHT" as Sense,
+        season: "SPRING" as Season,
+        ingredients: ["Mourne lamb", "herb crust", "dauphinoise"],
+      },
+      {
+        name: "Millbay Oysters",
+        description: "Andrew Rooney's famous Millbay oysters from Kilkeel—notes of cucumber, grass, and kelp.",
+        photo: courseImages.oysters,
+        sense: "TASTE" as Sense,
+        season: "AUTUMN" as Season,
+        ingredients: ["Millbay oysters", "Kilkeel", "shallot mignonette"],
+      },
+    ],
+    menu: "Tasting menu: 7 courses\nA la carte also available\nViews across to Carlingford",
+  },
+  // User requested additions
+  {
+    name: "Fodder",
+    slug: "fodder",
+    location: "Holywood",
+    description: "Farm to fork philosophy made real. Everything we can source locally, we do. Seasonal menus that change with what's fresh. Simple food, done properly.",
+    mood: "WARMING" as Mood,
+    courses: [
+      {
+        name: "Dexter Beef Tartare",
+        description: "Hand-chopped local Dexter beef with egg yolk, capers, and house-made sourdough. Raw and honest.",
+        photo: courseImages.beef,
+        sense: "TASTE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["Dexter beef", "egg yolk", "capers", "sourdough"],
+      },
+      {
+        name: "Pan-Roasted Hake",
+        description: "Line-caught hake from Portavogie, served with crushed Comber Earlies and wild garlic pesto.",
+        photo: courseImages.fish,
+        sense: "TEXTURE" as Sense,
+        season: "SPRING" as Season,
+        ingredients: ["Portavogie hake", "Comber Earlies", "wild garlic"],
+      },
+      {
+        name: "Scallops & Black Pudding",
+        description: "Seared scallops with Clonakilty black pudding, apple, and a light cider reduction.",
+        photo: courseImages.scallops,
+        sense: "TASTE" as Sense,
+        season: "AUTUMN" as Season,
+        ingredients: ["hand-dived scallops", "black pudding", "apple"],
+      },
+    ],
+    menu: "Lunch: Small plates to share\nDinner: Seasonal set menu\nSunday roast available",
+  },
+  {
+    name: "The Harbour Bar",
+    slug: "the-harbour-bar",
+    location: "Strangford",
+    description: "Overlooking the harbour since 1870. Fresh seafood, cold pints, and the same view the fishermen have seen for generations. Nothing fancy, everything right.",
+    mood: "QUIET" as Mood,
+    courses: [
+      {
+        name: "Langoustines",
+        description: "Half a kilo of Strangford langoustines, simply steamed and served with garlic butter for dipping.",
+        photo: courseImages.crab,
+        sense: "TASTE" as Sense,
+        season: "SUMMER" as Season,
+        ingredients: ["Strangford langoustines", "garlic butter", "lemon"],
+      },
+      {
+        name: "Fish Pie",
+        description: "Our famous fish pie, loaded with salmon, cod, and prawns under a fluffy potato crust.",
+        photo: courseImages.fish,
+        sense: "TASTE" as Sense,
+        season: "WINTER" as Season,
+        ingredients: ["mixed fish", "cream", "mashed potato"],
+      },
+    ],
+    menu: "Fresh langoustines when the boats come in\nFish pie daily\nCraft beers and local ciders",
+  },
+  {
+    name: "Denvir's",
+    slug: "denvirs",
+    location: "Downpatrick",
+    description: "The oldest coaching inn in Ireland, now a gastropub with soul. Historic surroundings, modern Irish cooking. Where the old road met the new.",
+    mood: "COMFORTING" as Mood,
+    courses: [
+      {
+        name: "Beef & Guinness Stew",
+        description: "Slow-cooked County Down beef in rich Guinness gravy with root vegetables. Served with colcannon.",
+        photo: courseImages.beef,
+        sense: "SMELL" as Sense,
+        season: "WINTER" as Season,
+        ingredients: ["County Down beef", "Guinness", "root vegetables", "colcannon"],
+      },
+      {
+        name: "Smoked Fish Board",
+        description: "A selection of locally smoked fish with pickles, capers, and brown bread. Perfect for sharing.",
+        photo: courseImages.salmon,
+        sense: "TASTE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["smoked salmon", "smoked mackerel", "pickles", "brown bread"],
+      },
+      {
+        name: "Apple & Blackberry Crumble",
+        description: "Armagh apples and wild blackberries under a buttery oat crumble. With proper custard.",
+        photo: courseImages.tart,
+        sense: "SMELL" as Sense,
+        season: "AUTUMN" as Season,
+        ingredients: ["Armagh apples", "wild blackberries", "oats", "custard"],
+      },
+    ],
+    menu: "Bar food all day\nRestaurant menu evenings\nLive traditional music Fridays",
+  },
+  {
+    name: "The Lakeside Inn",
+    slug: "the-lakeside-inn",
+    location: "Downpatrick",
+    description: "On the shores of a quiet lake, minutes from St. Patrick's grave. Sunday roasts, lakeside walks, the peace of a place that hasn't changed in decades.",
+    mood: "CONTEMPLATIVE" as Mood,
+    courses: [
+      {
+        name: "Sunday Roast",
+        description: "The full spread: roast beef, Yorkshire pudding, roast potatoes, vegetables, and rich gravy. Every Sunday.",
+        photo: courseImages.beef,
+        sense: "SIGHT" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["roast beef", "Yorkshire pudding", "gravy", "roast potatoes"],
+      },
+      {
+        name: "Pan-Fried Trout",
+        description: "Rainbow trout from the lough, pan-fried with brown butter, almonds, and lemon.",
+        photo: courseImages.fish,
+        sense: "TEXTURE" as Sense,
+        season: "SUMMER" as Season,
+        ingredients: ["rainbow trout", "brown butter", "almonds"],
+      },
+    ],
+    menu: "Sunday roast 12-6pm\nBar menu weekdays\nLakeside terrace in summer",
+  },
+  {
+    name: "The Old Post Office",
+    slug: "the-old-post-office",
+    location: "Comber",
+    description: "A former post office turned into a cosy café and restaurant. Famous for their wheaten bread and seasonal local produce. A Comber institution.",
+    mood: "COMFORTING" as Mood,
+    courses: [
+      {
+        name: "Comber Earlies & Salmon",
+        description: "New season Comber Earlies with flaked hot-smoked salmon, crème fraîche and chives. Simple, seasonal, perfect.",
+        photo: courseImages.salmon,
+        sense: "TASTE" as Sense,
+        season: "SUMMER" as Season,
+        ingredients: ["Comber Earlies PGI", "hot-smoked salmon", "chives"],
+      },
+      {
+        name: "Fresh Wheaten Bread",
+        description: "Our signature wheaten bread, still warm from the oven, served with local butter and honey.",
+        photo: courseImages.bread,
+        sense: "SMELL" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["wholemeal flour", "buttermilk", "local honey"],
+      },
+    ],
+    menu: "Breakfast 9-11:30\nLunch 12-3\nAfternoon tea by booking",
+  },
+  {
+    name: "The Square Bistro",
+    slug: "the-square-bistro",
+    location: "Comber",
+    description: "On the town square, a bistro serving honest European cooking with an Irish accent. Wine, conversation, and food that doesn't try too hard.",
+    mood: "CELEBRATORY" as Mood,
+    courses: [
+      {
+        name: "Duck Confit",
+        description: "Crispy duck leg confit with Puy lentils, wilted greens and a blackberry jus.",
+        photo: courseImages.beef,
+        sense: "TEXTURE" as Sense,
+        season: "AUTUMN" as Season,
+        ingredients: ["duck leg", "Puy lentils", "blackberry"],
+      },
+      {
+        name: "Seared Tuna",
+        description: "Rare seared tuna with sesame, wasabi and pickled ginger. A brief trip to Japan via Comber.",
+        photo: courseImages.fish,
+        sense: "SIGHT" as Sense,
+        season: "SUMMER" as Season,
+        ingredients: ["yellowfin tuna", "sesame", "wasabi", "ginger"],
+      },
+    ],
+    menu: "Early bird 5-7pm\nFull menu 7-9:30pm\nWine flights available",
+  },
+  {
+    name: "The Bay Tree",
+    slug: "the-bay-tree",
+    location: "Holywood",
+    description: "A neighbourhood favourite serving Mediterranean-inspired dishes with Irish ingredients. The kind of place you want on your street.",
+    mood: "WARMING" as Mood,
+    courses: [
+      {
+        name: "Mussels Provençal",
+        description: "Strangford mussels cooked with tomatoes, garlic, white wine and herbs. Crusty bread for mopping.",
+        photo: courseImages.mussels,
+        sense: "TASTE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["Strangford mussels", "tomatoes", "garlic", "white wine"],
+      },
+      {
+        name: "Lamb Tagine",
+        description: "Slow-cooked Mourne lamb with apricots, almonds and Moroccan spices. With fluffy couscous.",
+        photo: courseImages.lamb,
+        sense: "SMELL" as Sense,
+        season: "WINTER" as Season,
+        ingredients: ["Mourne lamb", "apricots", "almonds", "Ras el hanout"],
+      },
+    ],
+    menu: "Lunch specials daily\nTapas Tuesday\nFull menu Wed-Sun",
+  },
+  // RURAL INNS - non-negotiable anchors
+  {
+    name: "The Maghera Inn",
+    slug: "the-maghera-inn",
+    location: "Newcastle",
+    description: "A village inn at the foot of the Mournes. Fires in winter, short menu, no fuss. The kind of place people remember eating in twenty years later.",
+    mood: "WARMING" as Mood,
+    courses: [
+      {
+        name: "Irish Stew",
+        description: "The only stew worth ordering. Mourne lamb, potatoes, onions. Cooked for hours. Served with brown bread.",
+        photo: courseImages.lamb,
+        sense: "SMELL" as Sense,
+        season: "WINTER" as Season,
+        ingredients: ["Mourne lamb", "potatoes", "onions", "carrots"],
+      },
+    ],
+    menu: "Soup of the day\nIrish stew\nFish when available\nFire lit from October",
+  },
+  {
+    name: "The Percy French",
+    slug: "the-percy-french",
+    location: "Newcastle",
+    description: "Named for the songwriter who loved these mountains. Traditional pub with traditional food. The fire is always on.",
+    mood: "COMFORTING" as Mood,
+    courses: [
+      {
+        name: "Beef & Guinness Pie",
+        description: "Slow-cooked beef in Guinness gravy under golden pastry. A meal for after the mountain.",
+        photo: courseImages.beef,
+        sense: "SMELL" as Sense,
+        season: "WINTER" as Season,
+        ingredients: ["County Down beef", "Guinness", "pastry"],
+      },
+    ],
+    menu: "Pies and stews daily\nSandwiches all day\nWalk in, warm up",
+  },
+  {
+    name: "The Plough Inn",
+    slug: "the-plough-inn",
+    location: "Hillsborough",
+    description: "A proper village inn. Dark wood, low ceilings, the smell of fires and good cooking. Been here since 1750.",
+    mood: "QUIET" as Mood,
+    courses: [
+      {
+        name: "Steak & Ale Pie",
+        description: "Chunks of local beef braised in ale, topped with flaky pastry. With creamy mash.",
+        photo: courseImages.beef,
+        sense: "TASTE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["local beef", "local ale", "pastry"],
+      },
+    ],
+    menu: "Bar menu daily\nRestaurant Thurs-Sun\nSunday lunch",
+  },
+  // BAKERIES & MORNING ANCHORS - biggest blind spot
+  {
+    name: "Bia",
+    slug: "bia",
+    location: "Newcastle",
+    description: "Open at 8am. Coffee worth walking for, bread worth waiting for. Sourdough, pastries, and the best start to a day in the Mournes.",
+    mood: "QUIET" as Mood,
+    courses: [
+      {
+        name: "Sourdough Toast",
+        description: "Our house sourdough, thick-sliced and toasted. With local butter and marmalade.",
+        photo: courseImages.bread,
+        sense: "SMELL" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["house sourdough", "butter", "marmalade"],
+      },
+    ],
+    menu: "Coffee from 8am\nPastries until they're gone\nToasties and soups at lunch",
+  },
+  {
+    name: "Waddell's Bakery",
+    slug: "waddells-bakery",
+    location: "Downpatrick",
+    description: "Three generations of baking. The wheaten bread is legendary. Opens at 7:30am, closes when it's gone.",
+    mood: "COMFORTING" as Mood,
+    courses: [
+      {
+        name: "Wheaten Bread",
+        description: "The recipe hasn't changed. Wholemeal flour, buttermilk, a touch of treacle. Still warm at 8am.",
+        photo: courseImages.bread,
+        sense: "SMELL" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["wholemeal flour", "buttermilk", "treacle"],
+      },
+    ],
+    menu: "Wheaten bread from 7:30am\nSoda farls\nPotato bread\nOpen until sold out",
+  },
+  {
+    name: "The Poacher's Pocket",
+    slug: "the-poachers-pocket",
+    location: "Comber",
+    description: "A farmhouse café that opens early and closes when the light goes. Good coffee, honest breakfast, vegetables from the field behind.",
+    mood: "WARMING" as Mood,
+    courses: [
+      {
+        name: "Full Ulster",
+        description: "The works: bacon, sausage, black pudding, soda bread, eggs. Everything local.",
+        photo: courseImages.beef,
+        sense: "TASTE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["local bacon", "black pudding", "free-range eggs", "soda bread"],
+      },
+    ],
+    menu: "Breakfast from 9am\nLunch 12-3\nCoffee all day\nFarm shop attached",
+  },
+  {
+    name: "The Barking Dog",
+    slug: "the-barking-dog",
+    location: "Bangor",
+    description: "Morning coffee, afternoon wine, everything in between. A place that knows what it's doing at every hour.",
+    mood: "QUIET" as Mood,
+    courses: [
+      {
+        name: "Eggs Benedict",
+        description: "Poached eggs, proper hollandaise, and your choice of bacon or salmon on sourdough.",
+        photo: courseImages.salmon,
+        sense: "TASTE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["free-range eggs", "hollandaise", "sourdough"],
+      },
+    ],
+    menu: "Brunch 9am-3pm\nDinner Thurs-Sat\nCoffee always",
+  },
+  // MOURNE & STRANGFORD ANCHORS - destination places
+  {
+    name: "The Buck's Head",
+    slug: "the-bucks-head",
+    location: "Dundrum",
+    description: "In Dundrum village, near the castle, overlooking the bay. Seafood from the boats, views of the Mournes. Worth the drive.",
+    mood: "CONTEMPLATIVE" as Mood,
+    courses: [
+      {
+        name: "Dundrum Mussels",
+        description: "Rope-grown mussels from the bay outside. Cooked simply in garlic, wine, and cream.",
+        photo: courseImages.mussels,
+        sense: "TASTE" as Sense,
+        season: "AUTUMN" as Season,
+        ingredients: ["Dundrum mussels", "garlic", "white wine", "cream"],
+      },
+    ],
+    menu: "Seafood board\nMussels\nDaily fish\nViews of the bay",
+  },
+  {
+    name: "The Glass House",
+    slug: "the-glass-house",
+    location: "Portaferry",
+    description: "At the tip of the Ards Peninsula, looking across the narrows to Strangford. Seafood, wine, and the last light of the day.",
+    mood: "CELEBRATORY" as Mood,
+    courses: [
+      {
+        name: "Portaferry Seafood Platter",
+        description: "Everything from the boats: crab, lobster, prawns, oysters. For two, or for one if you're serious.",
+        photo: courseImages.crab,
+        sense: "SIGHT" as Sense,
+        season: "SUMMER" as Season,
+        ingredients: ["local crab", "lobster", "prawns", "oysters"],
+      },
+    ],
+    menu: "Seafood platters\nFresh fish daily\nSunset from the terrace",
+  },
+  // DISTILLERIES - as places, not brands
+  {
+    name: "Echlinville Distillery",
+    slug: "echlinville-distillery",
+    location: "Portaferry",
+    description: "A working distillery on the shores of the lough. Come for the tour, stay for the tasting. Whiskey, gin, and the quiet of a place that takes its time.",
+    mood: "CONTEMPLATIVE" as Mood,
+    courses: [
+      {
+        name: "Whiskey Tasting",
+        description: "A flight of house whiskeys, aged in different casks. Taken slowly, with water and time.",
+        photo: courseImages.whiskey,
+        sense: "SMELL" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["single malt", "sherry cask", "bourbon cask"],
+      },
+    ],
+    menu: "Tours daily at 11 and 2\nTasting room open 10-5\nLight bites available",
+  },
+  {
+    name: "Copeland Distillery",
+    slug: "copeland-distillery",
+    location: "Donaghadee",
+    description: "Gin and rum made with local botanicals, in a harbour town that's seen it all. A place to pause between walks.",
+    mood: "WARMING" as Mood,
+    courses: [
+      {
+        name: "Gin Tasting",
+        description: "A flight of house gins, each with different botanicals from the coast. Served with fever-tree and a slice.",
+        photo: courseImages.gin,
+        sense: "SMELL" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["local botanicals", "coastal herbs", "citrus"],
+      },
+    ],
+    menu: "Tastings by booking\nShop open daily\nCoffee and cake",
+  },
+  {
+    name: "Rademon Estate Distillery",
+    slug: "rademon-estate-distillery",
+    location: "Downpatrick",
+    description: "Shortcross gin, made on a family estate. Tours of the distillery, walks in the grounds. A destination, not a stop.",
+    mood: "QUIET" as Mood,
+    courses: [
+      {
+        name: "Shortcross Experience",
+        description: "Tour the distillery, learn the process, taste the gin. Includes a G&T to take into the gardens.",
+        photo: courseImages.distillery,
+        sense: "SMELL" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["wild clover", "elderflower", "citrus", "juniper"],
+      },
+    ],
+    menu: "Tours 11am and 2pm\nBooking required\nGardens open for walks",
+  },
+  // NORTH DOWN - Crawfordsburn, Helen's Bay, Groomsport
+  {
+    name: "The Old Inn",
+    slug: "the-old-inn-crawfordsburn",
+    location: "Crawfordsburn",
+    description: "Since 1614. One of Ireland's oldest coaching inns, where the fire still burns and the food still matters. Stone walls, low beams, and a sense that some places earn their history.",
+    mood: "WARMING" as Mood,
+    courses: [
+      {
+        name: "Beef Wellington",
+        description: "Dry-aged fillet wrapped in mushroom duxelles and pastry. A dish that rewards patience and a good claret.",
+        photo: courseImages.beef,
+        sense: "TASTE" as Sense,
+        season: "WINTER" as Season,
+        ingredients: ["dry-aged beef", "mushroom duxelles", "puff pastry", "Madeira jus"],
+      },
+      {
+        name: "Strangford Lough Mussels",
+        description: "In white wine, garlic and cream. Crusty bread for the broth. Simple because it should be.",
+        photo: courseImages.mussels,
+        sense: "SMELL" as Sense,
+        season: "AUTUMN" as Season,
+        ingredients: ["Strangford mussels", "white wine", "garlic", "cream"],
+      },
+      {
+        name: "Apple Crumble",
+        description: "Bramley apples from local orchards, buttery crumble, proper custard. The pudding your grandmother made, if she knew what she was doing.",
+        photo: courseImages.tart,
+        sense: "TASTE" as Sense,
+        season: "AUTUMN" as Season,
+        ingredients: ["Bramley apples", "butter crumble", "vanilla custard"],
+      },
+    ],
+    menu: "Lunch: Soup and wheaten, ploughman's, fish of the day\nDinner: Mussels, Wellington, catch of the day\nSunday: Roast beef, Yorkshire pudding, all the trimmings",
+  },
+  {
+    name: "The Boat House",
+    slug: "the-boat-house-groomsport",
+    location: "Groomsport",
+    description: "A harbourside tearoom in a village that time forgot. Fresh crab sandwiches, homemade scones, and a view of the boats. Best on a clear day when you can see Scotland.",
+    mood: "QUIET" as Mood,
+    courses: [
+      {
+        name: "Crab Sandwich",
+        description: "Fresh Portavogie crab, dressed simply with lemon and chives, on thick-cut white bread. Nothing more.",
+        photo: courseImages.crab,
+        sense: "TASTE" as Sense,
+        season: "SUMMER" as Season,
+        ingredients: ["Portavogie crab", "lemon", "chives", "white bread"],
+      },
+      {
+        name: "Fruit Scones",
+        description: "Warm from the oven, split and spread with butter and homemade jam. The smell of a proper tearoom.",
+        photo: courseImages.bread,
+        sense: "SMELL" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["flour", "butter", "sultanas", "strawberry jam"],
+      },
+    ],
+    menu: "Tea and scones\nCrab sandwiches (when the boats come in)\nHomemade traybakes",
+  },
+  {
+    name: "The Dirty Duck Alehouse",
+    slug: "dirty-duck-holywood",
+    location: "Helen's Bay",
+    description: "A beach bar with proper food. Fish and chips worth the drive, local ales, and a deck where you can watch the tide come in. No pretence, no fuss.",
+    mood: "COMFORTING" as Mood,
+    courses: [
+      {
+        name: "Beer-Battered Fish & Chips",
+        description: "Fresh haddock in a crisp ale batter, proper chips, mushy peas. The seaside done right.",
+        photo: courseImages.fish,
+        sense: "TASTE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["fresh haddock", "ale batter", "proper chips", "mushy peas"],
+      },
+      {
+        name: "Seafood Chowder",
+        description: "Thick with local fish, prawns and mussels. Warming on a grey day, satisfying on any other.",
+        photo: courseImages.chowder,
+        sense: "SMELL" as Sense,
+        season: "WINTER" as Season,
+        ingredients: ["white fish", "Portavogie prawns", "mussels", "cream"],
+      },
+    ],
+    menu: "Fish & chips always\nChowder in winter\nLocal ales on tap",
+  },
+  // CASTLEWELLAN & MOURNE FOOTHILLS
+  {
+    name: "The Slieve Croob Inn",
+    slug: "slieve-croob-inn",
+    location: "Castlewellan",
+    description: "At the gateway to Castlewellan Forest Park. A country inn where walkers gather after the trails, where the food is honest and the welcome is warm.",
+    mood: "WARMING" as Mood,
+    courses: [
+      {
+        name: "Irish Lamb Stew",
+        description: "Slow-cooked Mourne lamb with root vegetables and potatoes. The dish that warms you through.",
+        photo: courseImages.lamb,
+        sense: "SMELL" as Sense,
+        season: "WINTER" as Season,
+        ingredients: ["Mourne lamb", "carrots", "potatoes", "thyme"],
+      },
+      {
+        name: "Wheaten Bread & Champ",
+        description: "Soda bread warm from the oven, champ with spring onions and butter. Ulster comfort food.",
+        photo: courseImages.bread,
+        sense: "TASTE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["wheaten flour", "buttermilk", "potatoes", "spring onions"],
+      },
+    ],
+    menu: "Hearty lunches for walkers\nEvening meals by booking\nLocal ales and whiskey",
+  },
+  {
+    name: "The Peace Maze Café",
+    slug: "peace-maze-cafe",
+    location: "Castlewellan",
+    description: "Inside Castlewellan Forest Park, beside the world's largest permanent hedge maze. A place for tea after you've found your way out. Or given up.",
+    mood: "QUIET" as Mood,
+    courses: [
+      {
+        name: "Homemade Soup",
+        description: "Whatever vegetables came in that morning. Served with wheaten bread and butter. Simple, hot, good.",
+        photo: courseImages.chowder,
+        sense: "SMELL" as Sense,
+        season: "AUTUMN" as Season,
+        ingredients: ["seasonal vegetables", "stock", "wheaten bread"],
+      },
+    ],
+    menu: "Soups and sandwiches\nTraybakes\nTea and coffee\nOpen park hours",
+  },
+  // NEAR CASTLE WARD - GAME OF THRONES TERRITORY
+  {
+    name: "The Poacher's Pocket",
+    slug: "poachers-pocket-lisbane",
+    location: "Comber",
+    description: "A gastro-inn near Castle Ward, where Winterfell was born. After archery lessons and dire wolf encounters, this is where you come back to earth. Local produce, open fires, and a menu that changes with what's good.",
+    mood: "COMFORTING" as Mood,
+    courses: [
+      {
+        name: "Slow-Cooked Pork Belly",
+        description: "Free-range pork from local farms, cooked until yielding, with apple and crackling.",
+        photo: courseImages.beef,
+        sense: "TASTE" as Sense,
+        season: "AUTUMN" as Season,
+        ingredients: ["free-range pork", "Bramley apple", "crackling"],
+      },
+      {
+        name: "Game Pie",
+        description: "Rabbit, venison, and pheasant in rich gravy, under short-crust pastry. A dish that earns its name.",
+        photo: courseImages.beef,
+        sense: "SMELL" as Sense,
+        season: "WINTER" as Season,
+        ingredients: ["rabbit", "venison", "pheasant", "root vegetables"],
+      },
+      {
+        name: "Local Cheeseboard",
+        description: "Five Irish farmhouse cheeses with oatcakes, quince, and walnuts. A proper end to an evening.",
+        photo: courseImages.cheese,
+        sense: "TASTE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["Young Buck", "Cashel Blue", "Gubbeen", "oatcakes"],
+      },
+    ],
+    menu: "Sunday roasts\nGame in season\nCheese and wine evening Thursdays",
+  },
+  {
+    name: "The Cuan Licensed Guest Inn",
+    slug: "cuan-guest-inn",
+    location: "Strangford",
+    description: "A traditional inn overlooking the narrows, where the ferry crosses to Portaferry. Fresh fish from local boats, rooms upstairs, and the quiet pace of a place that hasn't hurried since 1623.",
+    mood: "QUIET" as Mood,
+    courses: [
+      {
+        name: "Pan-Fried Sea Trout",
+        description: "Local sea trout, simply cooked, with samphire and brown butter. The taste of the lough.",
+        photo: courseImages.fish,
+        sense: "TASTE" as Sense,
+        season: "SUMMER" as Season,
+        ingredients: ["sea trout", "samphire", "brown butter", "lemon"],
+      },
+      {
+        name: "Champ & Sausages",
+        description: "Proper pork sausages with creamy champ and onion gravy. Ulster comfort food at its best.",
+        photo: courseImages.beef,
+        sense: "TASTE" as Sense,
+        season: "WINTER" as Season,
+        ingredients: ["pork sausages", "potatoes", "spring onions", "butter"],
+      },
+    ],
+    menu: "Fresh fish daily\nBar meals and à la carte\nRooms available",
+  },
+  // KILBRONEY & SOUTH MOURNE
+  {
+    name: "The Kilbroney Tavern",
+    slug: "kilbroney-tavern",
+    location: "Rostrevor",
+    description: "At the edge of Kilbroney Park, where the oak woods meet the Mournes. A walker's pub with good food, local ales, and a fire that's always lit in winter.",
+    mood: "WARMING" as Mood,
+    courses: [
+      {
+        name: "Steak & Guinness Pie",
+        description: "Slow-braised beef in Guinness gravy, under puff pastry. The dish that fuels the trails.",
+        photo: courseImages.beef,
+        sense: "SMELL" as Sense,
+        season: "WINTER" as Season,
+        ingredients: ["braising steak", "Guinness", "onions", "puff pastry"],
+      },
+      {
+        name: "Carlingford Lough Oysters",
+        description: "From the beds just across the water. Cold, briny, and best with a pint of the black stuff.",
+        photo: courseImages.oysters,
+        sense: "TASTE" as Sense,
+        season: "AUTUMN" as Season,
+        ingredients: ["Carlingford oysters", "shallot vinegar", "lemon"],
+      },
+    ],
+    menu: "Pie and pint deals\nOysters in season\nSunday roast",
+  },
+  {
+    name: "Cloughmore Cottage Kitchen",
+    slug: "cloughmore-cottage-kitchen",
+    location: "Rostrevor",
+    description: "A tiny café near the legendary Cloughmore Stone. Homemade everything, from the bread to the jam. Where hikers refuel before climbing to see what Finn McCool threw.",
+    mood: "QUIET" as Mood,
+    courses: [
+      {
+        name: "Full Ulster Fry",
+        description: "Bacon, eggs, sausage, soda bread, potato bread, black pudding. Fuel for the climb ahead.",
+        photo: courseImages.bread,
+        sense: "SMELL" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["dry-cured bacon", "free-range eggs", "black pudding", "soda farls"],
+      },
+      {
+        name: "Fifteens",
+        description: "The Ulster classic: digestive biscuits, marshmallows, cherries, condensed milk, rolled in coconut. Fifteen of each.",
+        photo: courseImages.tart,
+        sense: "TASTE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["digestive biscuits", "marshmallows", "cherries", "coconut"],
+      },
+    ],
+    menu: "Full fry til noon\nSoups and sandwiches\nTraybakes all day",
+  },
+  // GAME OF THRONES EXPERIENCES - as places to visit
+  {
+    name: "Castle Ward Estate",
+    slug: "castle-ward-winterfell",
+    location: "Strangford",
+    description: "The real Winterfell. Castle Ward became the Stark family home, and they'll teach you archery where Jon Snow learned. Walk the grounds, see the tower, understand why they chose this place. A working estate with 820 acres of parkland.",
+    mood: "CONTEMPLATIVE" as Mood,
+    courses: [
+      {
+        name: "Winterfell Archery Experience",
+        description: "Learn to shoot where Jon Snow trained. Includes costume, bow, and instruction. One hour of pretending you're a Stark.",
+        photo: "https://cdn.abacus.ai/images/41f36dc7-c3ed-4509-90f3-68156e9ca245.png",
+        sense: "TEXTURE" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["longbow", "arrows", "Stark costume", "instruction"],
+      },
+    ],
+    menu: "Archery sessions daily\nEstate walks\nTearoom in the farmyard",
+  },
+  {
+    name: "Tollymore Forest Park",
+    slug: "tollymore-forest-haunted",
+    location: "Tollymore",
+    description: "The Haunted Forest. Where the White Walkers first appeared. Where the Starks found the direwolf pups. Ancient trees, stone bridges, and that sense that something is watching. One of Ireland's most atmospheric forests.",
+    mood: "CONTEMPLATIVE" as Mood,
+    courses: [
+      {
+        name: "Forest Walk",
+        description: "Two hours through the Haunted Forest. Stone follies, ancient trees, filming locations marked. Bring layers – it's always cooler under the canopy.",
+        photo: "https://cdn.abacus.ai/images/4b90f545-1c01-435c-9823-f338600546ea.png",
+        sense: "SIGHT" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["ancient oaks", "stone bridges", "river paths", "mountain views"],
+      },
+    ],
+    menu: "Café at the entrance\nPicnic areas by the river\nWild swimming spots (brave only)",
+  },
+  {
+    name: "Inch Abbey",
+    slug: "inch-abbey-riverrun",
+    location: "Downpatrick",
+    description: "Riverrun, seat of House Tully. Where Robb Stark was proclaimed King in the North. These 12th-century ruins sit in a bend of the River Quoile, atmospheric at any hour, magical at dusk.",
+    mood: "QUIET" as Mood,
+    courses: [
+      {
+        name: "Abbey Ruins Walk",
+        description: "Explore the Cistercian ruins where they filmed Robb's coronation. Free entry, open always. Best at sunset or early morning.",
+        photo: "https://cdn.abacus.ai/images/4f89ca7a-9f2f-4541-8239-34967115423e.png",
+        sense: "SIGHT" as Sense,
+        season: "ALL_YEAR" as Season,
+        ingredients: ["12th-century ruins", "River Quoile", "atmospheric stone", "ravens"],
+      },
+    ],
+    menu: "No café – bring a flask\nDownpatrick 5 minutes away\nWalk the riverside path",
+  },
+  {
+    name: "Strangford Lough Kayaking",
+    slug: "strangford-lough-kayaking",
+    location: "Strangford",
+    description: "Where Theon Greyjoy came ashore. Paddle the lough where iron islanders landed, where seals watch from the rocks, where the water is cold and clear. Guided tours from Strangford village.",
+    mood: "CONTEMPLATIVE" as Mood,
+    courses: [
+      {
+        name: "Lough Paddle",
+        description: "Three hours on the water. Seals, islands, and the narrows where the tide rips through. All equipment provided, no experience needed.",
+        photo: "https://cdn.abacus.ai/images/50f7912a-eda4-43bd-b4bf-0c04e71729ea.jpg",
+        sense: "TEXTURE" as Sense,
+        season: "SUMMER" as Season,
+        ingredients: ["kayaks", "seals", "islands", "cold water"],
+      },
+    ],
+    menu: "Tours by booking\nWetsuits provided\nPub afterwards (you'll need it)",
+  },
+];
+
+async function main() {
+  console.log("Starting seed...");
+
+  // Create test user (required for auth testing)
+  const testPasswordHash = await bcrypt.hash("johndoe123", 10);
+  await prisma.user.upsert({
+    where: { email: "john@doe.com" },
+    update: {},
+    create: {
+      email: "john@doe.com",
+      passwordHash: testPasswordHash,
+      restaurant: {
+        create: {
+          name: "Test Restaurant",
+          slug: "test-restaurant",
+          location: "Newcastle",
+          description: "A test restaurant for development purposes.",
+          mood: "QUIET",
+        },
+      },
+    },
+  });
+  console.log("Created test user");
+
+  // Create restaurants with courses
+  for (const r of restaurants) {
+    const passwordHash = await bcrypt.hash("restaurant123", 10);
+    const email = `${r.slug}@slowcodown.com`;
+
+    const user = await prisma.user.upsert({
+      where: { email },
+      update: {},
+      create: {
+        email,
+        passwordHash,
+        restaurant: {
+          create: {
+            name: r.name,
+            slug: r.slug,
+            location: r.location,
+            description: r.description,
+            coverImage: locationImages[r.location] || null,
+            coverImagePublic: true,
+            mood: r.mood,
+          },
+        },
+      },
+      include: { restaurant: true },
+    });
+
+    if (user.restaurant) {
+      // Add courses
+      for (const course of r.courses) {
+        await prisma.course.upsert({
+          where: {
+            id: `${user.restaurant.id}-${course.name.toLowerCase().replace(/\s+/g, "-")}`,
+          },
+          update: {},
+          create: {
+            id: `${user.restaurant.id}-${course.name.toLowerCase().replace(/\s+/g, "-")}`,
+            restaurantId: user.restaurant.id,
+            name: course.name,
+            description: course.description,
+            photo: course.photo,
+            photoPublic: true,
+            sense: course.sense,
+            season: course.season,
+            ingredients: course.ingredients,
+          },
+        });
+      }
+
+      // Add today's menu
+      if (r.menu) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        await prisma.dailyMenu.upsert({
+          where: {
+            restaurantId_date: {
+              restaurantId: user.restaurant.id,
+              date: today,
+            },
+          },
+          update: { content: r.menu },
+          create: {
+            restaurantId: user.restaurant.id,
+            date: today,
+            content: r.menu,
+          },
+        });
+      }
+    }
+
+    console.log(`Created: ${r.name}`);
+  }
+
+  console.log("Seed completed!");
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

@@ -1,0 +1,182 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+    output = "/home/ubuntu/slow_co_down/nextjs_space/node_modules/.prisma/client"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+enum Sense {
+  TASTE
+  SMELL
+  TEXTURE
+  SIGHT
+  SOUND
+}
+
+enum Season {
+  SPRING
+  SUMMER
+  AUTUMN
+  WINTER
+  ALL_YEAR
+}
+
+enum Mood {
+  QUIET
+  WARMING
+  CELEBRATORY
+  CONTEMPLATIVE
+  COMFORTING
+}
+
+enum BestEnjoyedWhen {
+  EARLY_MORNING
+  LONG_LUNCH
+  LATE_EVENING
+  AFTER_A_WALK
+  WHEN_RAINING
+  CELEBRATORY
+  ALONE
+  WITH_FRIENDS
+}
+
+enum ExperienceCategory {
+  DRINKS
+  WALKS
+  SEA
+  HIDDEN
+  MAKERS
+  MARKETS
+  STAY
+}
+
+model User {
+  id            String      @id @default(cuid())
+  email         String      @unique
+  passwordHash  String
+  restaurant    Restaurant?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Restaurant {
+  id            String       @id @default(cuid())
+  name          String
+  slug          String       @unique
+  location      String       // Town in County Down
+  description   String       @db.Text
+  coverImage    String?      // Cloud storage path
+  coverImagePublic Boolean   @default(true)
+  mood          Mood         @default(QUIET)
+  userId        String       @unique
+  user          User         @relation(fields: [userId], references: [id])
+  menus         DailyMenu[]
+  courses       Course[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model DailyMenu {
+  id            String      @id @default(cuid())
+  date          DateTime    @db.Date
+  content       String      @db.Text // Simple text description of today's offerings
+  restaurantId  String
+  restaurant    Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([restaurantId, date])
+}
+
+model Course {
+  id              String           @id @default(cuid())
+  name            String
+  description     String           @db.VarChar(300)
+  photo           String?          // Cloud storage path or CDN URL
+  photoPublic     Boolean          @default(true)
+  sense           Sense            @default(TASTE)
+  season          Season           @default(ALL_YEAR)
+  bestEnjoyedWhen BestEnjoyedWhen?
+  dateServed      DateTime?        @db.Date
+  ingredients     String[]         // Array of ingredient/origin tags
+  restaurantId    String
+  restaurant      Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+// Experiences beyond food - walks, drinks, sea trips, hidden gems, etc.
+model Experience {
+  id            String             @id @default(cuid())
+  name          String
+  slug          String             @unique
+  category      ExperienceCategory
+  location      String             // Town in County Down
+  description   String             @db.Text
+  shortDesc     String?            @db.VarChar(200) // One-liner
+  coverImage    String?
+  mood          Mood               @default(QUIET)
+  season        Season             @default(ALL_YEAR)
+  duration      String?            // e.g. "2 hours", "half day"
+  difficulty    String?            // For walks: easy, moderate, challenging
+  bookingUrl    String?            // External link if needed
+  tags          String[]           // Flexible tags
+  featured      Boolean            @default(false)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+}
+
+// Curated collections - "A Wet Afternoon in Strangford", "Kevin's Picks"
+model Collection {
+  id            String            @id @default(cuid())
+  name          String
+  slug          String            @unique
+  description   String            @db.Text
+  coverImage    String?
+  isKevinsPick  Boolean           @default(false)
+  mood          Mood?
+  season        Season?
+  items         CollectionItem[]
+  featured      Boolean           @default(false)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+}
+
+model CollectionItem {
+  id            String      @id @default(cuid())
+  collectionId  String
+  collection    Collection  @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  // Can link to restaurant, experience, or be standalone
+  restaurantId  String?
+  experienceId  String?
+  note          String?     @db.VarChar(200) // Editor's note for this item
+  orderIndex    Int         @default(0)
+  createdAt     DateTime    @default(now())
+}
+
+// Text Alert Subscribers - people who want to receive SMS alerts
+model TextAlertSubscriber {
+  id            String      @id @default(cuid())
+  phone         String      @unique
+  name          String?
+  locations     String[]    // Which locations they're interested in (empty = all)
+  interests     String[]    // Food interests: scallops, trout, oysters, etc.
+  active        Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+// Text Alerts sent by restaurants or admin
+model TextAlert {
+  id            String      @id @default(cuid())
+  message       String      @db.VarChar(160) // SMS character limit
+  sentBy        String?     // Restaurant ID or "admin"
+  sentByName    String?     // Restaurant name for display
+  location      String?     // Target location (null = all)
+  recipientCount Int        @default(0)
+  createdAt     DateTime    @default(now())
+}
