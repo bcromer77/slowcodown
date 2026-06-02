@@ -40,18 +40,24 @@ const seasonLabels: Record<string, string> = {
 };
 
 export default async function PlacePage({ params }: { params: { slug: string } }) {
-  const restaurant = await prisma.restaurant.findUnique({
-    where: { slug: params.slug },
-    include: {
-      menus: {
-        orderBy: { date: "desc" },
-        take: 7,
+  let restaurant: Awaited<ReturnType<typeof prisma.restaurant.findUnique>> | null = null;
+
+  try {
+    restaurant = await prisma.restaurant.findUnique({
+      where: { slug: params.slug },
+      include: {
+        menus: {
+          orderBy: { date: "desc" },
+          take: 7,
+        },
+        courses: {
+          orderBy: { createdAt: "desc" },
+        },
       },
-      courses: {
-        orderBy: { createdAt: "desc" },
-      },
-    },
-  });
+    });
+  } catch (error) {
+    console.error("Database connection error:", error);
+  }
 
   if (!restaurant) {
     notFound();
