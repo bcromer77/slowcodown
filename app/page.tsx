@@ -9,30 +9,39 @@ import prisma from "@/lib/db";
 import { EDITORS_LETTER, EDITOR_TITLE, EDITOR_ROLE, EDITOR_TAGLINE, EXPERIENCE_CATEGORIES } from "@/lib/constants";
 
 export default async function HomePage() {
-  const restaurants = await prisma.restaurant.findMany({
-    where: { description: { not: "" } },
-    take: 6,
-    orderBy: { createdAt: "desc" },
-    include: {
-      _count: { select: { courses: true } },
-    },
-  });
+  let restaurants: { id: string; name: string; slug: string; location: string; coverImage?: string | null; _count?: { courses: number } }[] = [];
+  let courses: { id: string; name: string; photo?: string | null; restaurant?: { name: string; slug: string; location: string } | null }[] = [];
+  let experiences: { id: string; name: string; slug: string; category: string; location: string; description: string; coverImage?: string | null }[] = [];
 
-  const courses = await prisma.course.findMany({
-    take: 4,
-    orderBy: { createdAt: "desc" },
-    include: {
-      restaurant: {
-        select: { name: true, slug: true, location: true },
+  try {
+    restaurants = await prisma.restaurant.findMany({
+      where: { description: { not: "" } },
+      take: 6,
+      orderBy: { createdAt: "desc" },
+      include: {
+        _count: { select: { courses: true } },
       },
-    },
-  });
+    });
 
-  const experiences = await prisma.experience.findMany({
-    take: 6,
-    where: { featured: true },
-    orderBy: { createdAt: "desc" },
-  });
+    courses = await prisma.course.findMany({
+      take: 4,
+      orderBy: { createdAt: "desc" },
+      include: {
+        restaurant: {
+          select: { name: true, slug: true, location: true },
+        },
+      },
+    });
+
+    experiences = await prisma.experience.findMany({
+      take: 6,
+      where: { featured: true },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (error) {
+    console.error("Database connection error:", error);
+    // Continue with empty arrays - page will render without dynamic content
+  }
 
   return (
     <>
